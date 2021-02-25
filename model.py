@@ -14,7 +14,7 @@ from torch.nn import Module, Parameter
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder
 from torch.nn import TransformerEncoderLayer
-from conformer import ConformerConvModule
+from conformer import ConformerBlock
 
 class FixedPositionalEmbedding(nn.Module):
     def __init__(self, dim):
@@ -35,15 +35,16 @@ class Conformer(nn.Module):
         self.layers = nn.ModuleList([])
         for _ in range(depth):
             self.layers.append(
-                ConformerConvModule(
-                    dim=dim,
-                    # auto-regressive or not - 1d conv will be made causal with padding if so
-                    causal=causal,
-                    # what multiple of the dimension to expand for the depthwise convolution
-                    expansion_factor=2,
-                    kernel_size=kernel_size,           # kernel size, 17 - 31 was said to be optimal
-                    dropout=dropout                # dropout at the very end
-                )
+                # ConformerConvModule(
+                #     dim=dim,
+                #     # auto-regressive or not - 1d conv will be made causal with padding if so
+                #     causal=causal,
+                #     # what multiple of the dimension to expand for the depthwise convolution
+                #     expansion_factor=2,
+                #     kernel_size=kernel_size,           # kernel size, 17 - 31 was said to be optimal
+                #     dropout=dropout                # dropout at the very end
+                # ),
+                ConformerBlock(dim=dim, dim_head=dim_head, heads=heads, conv_kernel_size=kernel_size, conv_dropout=dropout, ff_dropout=dropout, attn_dropout=dropout)
             )
 
     def forward(self, x, mask=None):
@@ -98,7 +99,7 @@ class SelfAttentionNetwork(Module):
         # self.embedding = nn.Embedding(self.n_node, self.hidden_size)
         # self.transformerEncoderLayer = TransformerEncoderLayer(d_model=self.hidden_size, nhead=opt.nhead,dim_feedforward=self.hidden_size * opt.feedforward)
         # self.transformerEncoder = TransformerEncoder(self.transformerEncoderLayer, opt.layer)
-        self.transformerEncoder = ConformerEncoder(num_tokens=self.n_node, num_classes=self.n_node, dim=self.hidden_size, depth=opt.layer, heads=opt.nhead, dim_head=dim, dropout=0.1, emb_dropout=0.1, causal=False, kernel_size=3)
+        self.transformerEncoder = ConformerEncoder(num_tokens=self.n_node, num_classes=self.n_node, dim=self.hidden_size, depth=opt.layer, heads=opt.nhead, dim_head=128, dropout=0.1, emb_dropout=0.1, causal=False, kernel_size=3)
         self.loss_function = nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr, weight_decay=opt.l2)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=opt.lr_dc_step, gamma=opt.lr_dc)
@@ -121,13 +122,6 @@ class SelfAttentionNetwork(Module):
     #     hidden = self.transformerEncoder(hidden)
     #     hidden = hidden.transpose(0,1).contiguous()
     #     return hidden
-
-    def compute_scores(self, hidden, mask):
-        ht = hidden[torch.arange(mask.shape[0]).long(), torch.sum(mask, 1) - 1]  # batch_size x latent_size
-        print(hidden.shape, mask.shape, self.embedding.weight.shape)
-        b = self.transformerEncoder.item_embed.weight[1:]  # n_nodes x latent_size
-        scores = torch.matmul(ht, b.transpose(1, 0))
-        return scores
 
 
     def forward(self, inputs):
