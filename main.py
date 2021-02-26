@@ -17,7 +17,7 @@ parser.add_argument('--dataset', default='sample', help='dataset name: diginetic
 parser.add_argument('--batchSize', type=int, default=100, help='input batch size')
 parser.add_argument('--hiddenSize', type=int, default=96, help='hidden state size')
 parser.add_argument('--nhead', type=int, default=8, help='the number of heads of multi-head attention')
-parser.add_argument('--layer', type=int, default=4, help='number of SAN layers')
+parser.add_argument('--layer', type=int, default=1, help='number of SAN layers')
 parser.add_argument('--feedforward', type=int, default=4, help='the multipler of hidden state size')
 parser.add_argument('--epoch', type=int, default=12, help='the number of epochs to train for')
 parser.add_argument('--lr', type=float, default=0.001, help='learning rate')  # [0.001, 0.0005, 0.0001]

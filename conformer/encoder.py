@@ -30,6 +30,18 @@ from conformer.modules import (
     Linear,
 )
 
+class FixedPositionalEmbedding(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        inv_freq = 1. / (10000 ** (torch.arange(0, dim, 2).float() / dim))
+        self.register_buffer('inv_freq', inv_freq)
+
+    def forward(self, x, seq_dim = 1, offset = 0):
+        t = torch.arange(x.shape[seq_dim], device = x.device).type_as(self.inv_freq) + offset
+        sinusoid_inp = torch.einsum('i , j -> i j', t, self.inv_freq)
+        emb = torch.cat((sinusoid_inp.sin(), sinusoid_inp.cos()), dim=-1)
+        return emb[None, :, :]
+
 
 class ConformerBlock(nn.Module):
     """
@@ -181,6 +193,8 @@ class ConformerEncoder(nn.Module):
             device=device,
         ).to(device) for _ in range(num_layers)])
 
+        self.pos = FixedPositionalEmbedding(encoder_dim)
+
     def count_parameters(self) -> int:
         """ Count parameters of encoder """
         return sum([p.numel for p in self.parameters()])
@@ -209,7 +223,8 @@ class ConformerEncoder(nn.Module):
         """
         # outputs, output_lengths = self.conv_subsample(inputs, input_lengths)
         # print(inputs.size())
-        outputs = self.item_embed(inputs) # TODO Positional Embedding
+        inputs = self.item_embed(inputs)
+        outputs = inputs + self.pos(inputs)
 
         for layer in self.layers:
             outputs = layer(outputs)
