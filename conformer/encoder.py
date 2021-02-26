@@ -21,7 +21,8 @@ from conformer.feed_forward import FeedForwardModule
 from conformer.attention import MultiHeadedSelfAttentionModule
 from conformer.convolution import (
     ConformerConvModule,
-    Conv2dSubampling,
+    # Conv2dSubampling,
+    # Conv1dSubampling,
 )
 from conformer.modules import (
     ResidualConnectionModule,
@@ -159,11 +160,14 @@ class ConformerEncoder(nn.Module):
             device: torch.device = 'cuda',
     ):
         super(ConformerEncoder, self).__init__()
-        self.conv_subsample = Conv2dSubampling(in_channels=1, out_channels=encoder_dim)
-        self.input_projection = nn.Sequential(
-            Linear(encoder_dim * (((input_dim - 1) // 2 - 1) // 2), encoder_dim),
-            nn.Dropout(p=input_dropout_p),
-        )
+        # self.conv_subsample = Conv2dSubampling(in_channels=1, out_channels=encoder_dim)
+        # self.conv_subsample = Conv1dSubampling(in_channels=1, out_channels=encoder_dim)
+        
+        # self.input_projection = nn.Sequential(
+        #     Linear(input_dim, encoder_dim),
+        #     nn.Dropout(p=input_dropout_p),
+        # )
+        self.item_embed = nn.Embedding(input_dim, encoder_dim)
         self.layers = nn.ModuleList([ConformerBlock(
             encoder_dim=encoder_dim,
             num_attention_heads=num_attention_heads,
@@ -187,7 +191,7 @@ class ConformerEncoder(nn.Module):
             if isinstance(child, nn.Dropout):
                 child.p = dropout_p
 
-    def forward(self, inputs: Tensor, input_lengths: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(self, inputs: Tensor) -> Tensor:
         """
         Forward propagate a `inputs` for  encoder training.
 
@@ -203,10 +207,12 @@ class ConformerEncoder(nn.Module):
                 ``(batch, seq_length, dimension)``
             * output_lengths (torch.LongTensor): The length of output tensor. ``(batch)``
         """
-        outputs, output_lengths = self.conv_subsample(inputs, input_lengths)
-        outputs = self.input_projection(outputs)
+        # outputs, output_lengths = self.conv_subsample(inputs, input_lengths)
+        # print(inputs.size())
+        outputs = self.item_embed(inputs) # TODO Positional Embedding
 
         for layer in self.layers:
             outputs = layer(outputs)
+            # print("output size: ", outputs.size())
 
-        return outputs, output_lengths
+        return outputs # output_lengths

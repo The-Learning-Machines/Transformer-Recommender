@@ -12,8 +12,8 @@ import torch
 from torch import nn
 from torch.nn import Module, Parameter
 import torch.nn.functional as F
-from torch.nn import TransformerEncoder
-from torch.nn import TransformerEncoderLayer
+# from torch.nn import TransformerEncoder
+# from torch.nn import TransformerEncoderLayer
 from nfnets.agc import AGC
 from conformer import ConformerEncoder
 
@@ -78,20 +78,22 @@ class SelfAttentionNetwork(Module):
         self.hidden_size = opt.hiddenSize
         self.n_node = n_node
         self.batch_size = opt.batchSize
-        self.embedding = nn.Embedding(self.n_node, self.hidden_size)
+        # self.embedding = nn.Embedding(self.n_node, self.hidden_size)
         # self.transformerEncoderLayer = TransformerEncoderLayer(d_model=self.hidden_size, nhead=opt.nhead,dim_feedforward=self.hidden_size * opt.feedforward)
         # self.transformerEncoder = TransformerEncoder(self.transformerEncoderLayer, opt.layer)
+        # print(self.n_node)
         self.transformerEncoder = ConformerEncoder(
-            input_dim = self.hidden_size,
-            encoder_dim = 64,
+            input_dim = self.n_node,
+            encoder_dim = 128,
             num_layers = opt.layer, 
-            num_attention_heads = 4,
-            input_dropout_p = 0,
-            feed_forward_dropout_p = 0,
-            attention_dropout_p = 0,
-            conv_dropout_p = 0,
+            num_attention_heads = opt.nhead,
+            input_dropout_p = 0.1,
+            feed_forward_dropout_p = 0.1,
+            attention_dropout_p = 0.1,
+            conv_dropout_p = 0.1,
 
         )
+        # self.final_linear = nn.Linear(64, 1)
         self.loss_function = nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr, weight_decay=opt.l2)
         self.AGC_optim = AGC(self.parameters(), self.optimizer)
@@ -117,10 +119,15 @@ class SelfAttentionNetwork(Module):
     #     return hidden
 
     def forward(self, inputs):
-        print(inputs.size())
-        hidden, _ = self.transformerEncoder(inputs, inputs.size()[1])
+        # print(inputs.size())
+        hidden = self.transformerEncoder(inputs)
         # hidden = hidden.transpose(0,1).contiguous()
-        hidden = torch.matmul(hidden, self.transformerEncoder.item_embed.weight[1:].transpose(1, 0))
+        # print(hidden.size())
+        hidden = torch.matmul(hidden, self.transformerEncoder.item_embed.weight[1:].transpose(1, 0)) # weight tying
+        # hidden = self.final_linear(hidden)
+        # hidden = torch.squeeze(hidden, -1)
+        # print(hidden.size())
+
         return hidden
 
 
@@ -141,10 +148,12 @@ def trans_to_cpu(variable):
 def forward(model, i, data):
     alias_inputs, A, items, mask, targets = data.get_slice(i)
     # alias_inputs = trans_to_cuda(torch.Tensor(alias_inputs).long())
+    # print(len(targets))
     items = trans_to_cuda(torch.Tensor(items).long())
     # A = trans_to_cuda(torch.Tensor(A).float())
     mask = trans_to_cuda(torch.Tensor(mask).long())
-    hidden = model(items, A)
+    hidden = model(items)
+    hidden = hidden.mean(dim=1)
     # get = lambda i: hidden[i][alias_inputs[i]]
     # seq_hidden = torch.stack([get(i) for i in torch.arange(len(alias_inputs)).long()])
     return targets, hidden # model.compute_scores(seq_hidden, mask)

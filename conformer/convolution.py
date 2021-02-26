@@ -187,3 +187,12 @@ class Conv2dSubampling(nn.Module):
         output_lengths -= 1
 
         return outputs, output_lengths
+
+# class Conv1dSubampling(nn.Module):
+#     def __init__(self, in_channels: int, out_channels: int) -> None:
+#         super(Conv1dSubampling, self).__init__()
+#         self.sequential(
+#             nn.Conv1d(in_channels, out_channels, kernel_size=3, stride=2),
+#             nn.ReLU(),
+#             nn.Conv1d(out_channels, out_channels, kernel_size=3, stride2)
+#         )
