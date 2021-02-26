@@ -94,7 +94,7 @@ class SelfAttentionNetwork(Module):
         )
         self.loss_function = nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=opt.lr, weight_decay=opt.l2)
-        self.AGC_optim = AGC(self.parameters, self.optimizer)
+        self.AGC_optim = AGC(self.parameters(), self.optimizer)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=opt.lr_dc_step, gamma=opt.lr_dc)
         self.reset_parameters()
 
