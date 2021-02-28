@@ -11,27 +11,30 @@ import pickle
 import time
 from utils import  Data, split_validation
 from model import *
+from torch.utils.tensorboard import SummaryWriter
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', default='sample', help='dataset name: diginetica/yoochoose1_64')
 parser.add_argument('--batchSize', type=int, default=100, help='input batch size')
-parser.add_argument('--hiddenSize', type=int, default=96, help='hidden state size')
-parser.add_argument('--nhead', type=int, default=8, help='the number of heads of multi-head attention')
-parser.add_argument('--layer', type=int, default=1, help='number of SAN layers')
+parser.add_argument('--hiddenSize', type=int, default=128, help='hidden state size')
+parser.add_argument('--nhead', type=int, default=1, help='the number of heads of multi-head attention')
+parser.add_argument('--layer', type=int, default=4, help='number of SAN layers')
 parser.add_argument('--feedforward', type=int, default=4, help='the multipler of hidden state size')
-parser.add_argument('--epoch', type=int, default=12, help='the number of epochs to train for')
-parser.add_argument('--lr', type=float, default=0.001, help='learning rate')  # [0.001, 0.0005, 0.0001]
+parser.add_argument('--epoch', type=int, default=100, help='the number of epochs to train for')
+parser.add_argument('--lr', type=float, default=0.01, help='learning rate')  # [0.001, 0.0005, 0.0001]
 parser.add_argument('--lr_dc', type=float, default=0.1, help='learning rate decay rate')
-parser.add_argument('--lr_dc_step', type=int, default=3, help='the number of steps after which the learning rate decay')
+parser.add_argument('--lr_dc_step', type=int, default=5, help='the number of steps after which the learning rate decay')
 parser.add_argument('--l2', type=float, default=1e-5, help='l2 penalty')  # [0.001, 0.0005, 0.0001, 0.00005, 0.00001]
-parser.add_argument('--patience', type=int, default=10, help='the number of epoch to wait before early stop ')
+parser.add_argument('--patience', type=int, default=100, help='the number of epoch to wait before early stop ')
 parser.add_argument('--validation', action='store_true', help='validation')
 parser.add_argument('--valid_portion', type=float, default=0.1, help='split the portion of training set as validation set')
 opt = parser.parse_args()
 print(opt)
 
+writer = SummaryWriter("./logs/")
 
 def main():
+    step = 0
     train_data = pickle.load(open('datasets/yoochoose1_64/train.txt', 'rb'))
     if opt.validation:
         train_data, valid_data = split_validation(train_data, opt.valid_portion)
@@ -56,7 +59,7 @@ def main():
     for epoch in range(opt.epoch):
         print('-------------------------------------------------------')
         print('epoch: ', epoch)
-        hit, mrr = train_test(model, train_data, test_data)
+        hit, mrr, step = train_test(model, train_data, test_data, writer, step)
         flag = 0
         if hit >= best_result[0]:
             best_result[0] = hit
@@ -66,8 +69,10 @@ def main():
             best_result[1] = mrr
             best_epoch[1] = epoch
             flag = 1
+        if flag:
+            torch.save(model, f"./checkpoints/{opt.dataset}_val_mmr_{best_result[1]}_ep{epoch}.pth")
         print('Best Result:')
-        print('\tRecall@20:\t%.4f\tMMR@20:\t%.4f\tEpoch:\t%d,\t%d'% (best_result[0], best_result[1], best_epoch[0], best_epoch[1]))
+        print('\tRecall@20: %.4f\tMMR@20: %.4f\tEpoch:\t%d,\t%d'% (best_result[0], best_result[1], best_epoch[0], best_epoch[1]))
         bad_counter += 1 - flag
         if bad_counter >= opt.patience:
             break
